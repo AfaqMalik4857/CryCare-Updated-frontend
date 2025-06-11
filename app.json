@@ -1,0 +1,33 @@
+{
+  "expo": {
+    "name": "cry-Care",
+    "slug": "cry-Care",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/crycarelogo.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/crycarelogo.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.afaqmalik4857.cryCare"
+    },
+    "web": {
+      "favicon": "./assets/crycarelogo.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "95685d01-6de3-4512-839d-18a661ab9954"
+      }
+    }
+  }
+}
