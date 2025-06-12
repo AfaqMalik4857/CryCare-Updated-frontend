@@ -12,46 +12,66 @@ import axios from "axios";
 import Icon from "react-native-vector-icons/Ionicons";
 import { LinearGradient } from "expo-linear-gradient";
 import { AuthContext } from "../context/authContext";
+import { baseIP } from "../const";
 
-const ResetPasswordConfirm = ({ navigation }) => {
-  const { setForgotEmail } = useContext(AuthContext);
-  const [email, setEmail] = useState("");
+const ResetPasswordConfirm = ({ navigation, route }) => {
+  const { forgotEmail } = useContext(AuthContext);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleResetRequestConfirm = async () => {
-    if (!email) {
-      Alert.alert("Error", "Please enter your email address.");
+  const handleResetPassword = async () => {
+    if (!newPassword || !confirmPassword) {
+      Alert.alert("Error", "All fields are required.");
       return;
     }
+
+    if (newPassword.length < 6) {
+      Alert.alert("Error", "Password must be at least 6 characters long.");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      Alert.alert("Error", "Passwords do not match.");
+      return;
+    }
+
     try {
-      const data = {
-        email: email,
-      };
       setLoading(true);
-      const response = await axios
-        .post("http://192.168.0.101:8080/forgetpassword", data, {
+      const response = await axios.post(
+        `http://${baseIP}:8080/resetpassword`,
+        {
+          email: forgotEmail,
+          token: route.params?.token,
+          newPassword,
+        },
+        {
           headers: {
             "Content-Type": "application/json",
           },
-        })
-        .then((response) => {
-          if (response.data.success) {
-            setForgotEmail(email);
-            navigation.navigate("ResetPasswordConfirm");
-            Alert.alert(
-              "Success",
-              "A password reset link has been sent to your email."
-            );
-          } else {
-            Alert.alert(
-              "Error",
-              response.data.message || "An error occurred. Please try again."
-            );
-          }
-        });
+        }
+      );
+
+      if (response.data.success) {
+        Alert.alert(
+          "Success",
+          "Your password has been reset successfully.",
+          [
+            {
+              text: "OK",
+              onPress: () => navigation.navigate("Login"),
+            },
+          ]
+        );
+      } else {
+        Alert.alert("Error", response.data.message || "An error occurred. Please try again.");
+      }
     } catch (error) {
       console.error("Error:", error.response?.data || error.message);
-      Alert.alert("Error", "There was an error processing your request.");
+      Alert.alert(
+        "Error",
+        error.response?.data?.message || "There was an error processing your request."
+      );
     } finally {
       setLoading(false);
     }
@@ -78,24 +98,32 @@ const ResetPasswordConfirm = ({ navigation }) => {
       </View>
       <View style={{ flex: 1, padding: 20 }}>
         <Text style={styles.title}>Reset Password</Text>
-        <Text
-          style={{ marginBottom: 30, fontSize: 16, color: "#174684" }}
-        ></Text>
+        <Text style={styles.subtitle}>
+          Please enter your new password below.
+        </Text>
         <TextInput
           style={styles.input}
-          placeholder="Enter your email"
-          value={email}
-          onChangeText={setEmail}
-          keyboardType="email-address"
+          placeholder="Enter new password"
+          value={newPassword}
+          onChangeText={setNewPassword}
+          secureTextEntry
+          autoCapitalize="none"
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="Confirm new password"
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+          secureTextEntry
           autoCapitalize="none"
         />
         <TouchableOpacity
           style={styles.button}
-          onPress={handleResetRequestConfirm}
+          onPress={handleResetPassword}
           disabled={loading}
         >
           <Text style={styles.buttonText}>
-            {loading ? "Sending..." : "Reset Password"}
+            {loading ? "Resetting..." : "Reset Password"}
           </Text>
         </TouchableOpacity>
       </View>
@@ -131,6 +159,12 @@ const styles = StyleSheet.create({
     marginTop: 80,
     textAlign: "left",
   },
+  subtitle: {
+    color: "#666",
+    fontSize: 16,
+    marginBottom: 30,
+    lineHeight: 22,
+  },
   input: {
     height: 50,
     borderColor: "#ccc",
@@ -143,7 +177,7 @@ const styles = StyleSheet.create({
   button: {
     backgroundColor: "#2c709e",
     padding: 15,
-    width: 150,
+    width: 200,
     borderRadius: 8,
     marginTop: 20,
     alignItems: "center",
@@ -155,4 +189,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ResetPasswordConfirm;
+export default ResetPasswordConfirm; 

@@ -19,40 +19,55 @@ const ForgetPassword = ({ navigation }) => {
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleResetRequest = async (e) => {
-    e.preventDefault();
-
+  const handleResetRequest = async () => {
     // Validate email
     if (!email) {
-      Alert.alert("Error", "Email is required");
+      Alert.alert("Error", "Please enter your email address.");
+      return;
+    }
+
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      Alert.alert("Error", "Please enter a valid email address.");
       return;
     }
 
     try {
-      const response = await fetch(`http://${baseIP}:8080/forgetpassword`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email }),
-      });
+      setLoading(true);
+      const response = await axios.post(
+        `http://${baseIP}:8080/forgetpassword`,
+        { email },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+        }
+      );
 
-      // Check if the response is ok (status in the range 200-299)
-      if (!response.ok) {
-        const errorData = await response.json(); // Get error details
-        Alert.alert("Error", errorData.message);
-        return; // Exit if there's an error
-      }
-
-      const data = await response.json();
-      if (data.success) {
-        Alert.alert("Success", "Email sent successfully");
+      if (response.data.success) {
+        setForgotEmail(email);
+        Alert.alert(
+          "Success",
+          "Password reset instructions have been sent to your email.",
+          [
+            {
+              text: "OK",
+              onPress: () => navigation.navigate("ResetPasswordConfirm"),
+            },
+          ]
+        );
       } else {
-        Alert.alert("Error", data.message);
+        Alert.alert("Error", response.data.message || "An error occurred. Please try again.");
       }
     } catch (error) {
-      console.error("Network error:", error);
-      Alert.alert("Error", "Network error occurred");
+      console.error("Error:", error.response?.data || error.message);
+      Alert.alert(
+        "Error",
+        error.response?.data?.message || "There was an error processing your request."
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -77,21 +92,27 @@ const ForgetPassword = ({ navigation }) => {
       </View>
       <View style={{ flex: 1, padding: 20 }}>
         <Text style={styles.title}>Reset Password</Text>
-        <Text style={{ marginBottom: 30, fontSize: 16, color: "#174684" }}>
-          Enter your email address associated with your account and We'll send
-          your password reset info to the email address linked to your account.
+        <Text style={styles.subtitle}>
+          Enter your email address associated with your account and we'll send
+          password reset instructions to your email.
         </Text>
         <TextInput
           style={styles.input}
           placeholder="Enter your email"
           value={email}
           onChangeText={setEmail}
-          onChange={(e) => setEmail(e.target.value)}
           keyboardType="email-address"
           autoCapitalize="none"
+          autoComplete="email"
         />
-        <TouchableOpacity style={styles.button} onPress={handleResetRequest}>
-          <Text style={styles.buttonText}>Reset Password</Text>
+        <TouchableOpacity 
+          style={[styles.button, loading && styles.buttonDisabled]} 
+          onPress={handleResetRequest} 
+          disabled={loading}
+        >
+          <Text style={styles.buttonText}>
+            {loading ? "Sending..." : "Send Reset Link"}
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -126,6 +147,12 @@ const styles = StyleSheet.create({
     marginTop: 80,
     textAlign: "left",
   },
+  subtitle: {
+    color: "#666",
+    fontSize: 16,
+    marginBottom: 30,
+    lineHeight: 22,
+  },
   input: {
     height: 50,
     borderColor: "#ccc",
@@ -138,11 +165,14 @@ const styles = StyleSheet.create({
   button: {
     backgroundColor: "#2c709e",
     padding: 15,
-    width: 150,
+    width: 200,
     borderRadius: 8,
     marginTop: 20,
     alignItems: "center",
     alignSelf: "center",
+  },
+  buttonDisabled: {
+    backgroundColor: "#a0a0a0",
   },
   buttonText: {
     color: "#fff",
@@ -150,4 +180,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ForgetPassword;
+export default ForgetPassword; 
