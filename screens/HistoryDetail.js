@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,14 @@ import {
 import { LinearGradient } from "expo-linear-gradient";
 import Icon from "react-native-vector-icons/Ionicons";
 import { Audio } from "expo-av";
+
+// Format duration for display
+const formatDuration = (seconds) => {
+  if (!seconds && seconds !== 0) return "0:00";
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+};
 
 // Helper function to get the XGBoost prediction label safely
 const getXGBoostPrediction = (predictions) => {
@@ -88,7 +96,7 @@ const getPredictionImage = (prediction) => {
 
 const HistoryDetail = ({ route, navigation }) => {
   // Extract parameters passed from Recording screen or History screen
-  const { recordingUri, duration, predictions, timestamp, prediction } =
+  const { recordingUri, duration, predictions, timestamp, prediction, recordingDuration: initialRecordingDuration } =
     route.params;
 
   console.log("HistoryDetail - Received params:", {
@@ -118,13 +126,21 @@ const HistoryDetail = ({ route, navigation }) => {
   const [sound, setSound] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoadingSound, setIsLoadingSound] = useState(false);
-  const [recordingDuration, setRecordingDuration] = useState(0);
+  const [recordingDuration, setRecordingDuration] = useState(initialRecordingDuration || 0);
   const [amplitude, setAmplitude] = useState(0);
   const [durationTimer, setDurationTimer] = useState(null);
+  const [isRecording, setIsRecording] = useState(false);
+  const [recording, setRecording] = useState(null);
+  const [newRecordingUri, setNewRecordingUri] = useState(null);
+  const recordingRef = useRef(null);
+  const timerRef = useRef(null);
 
   // Function to load the sound
   const loadSound = async () => {
-    if (!recordingUri) return;
+    if (!recordingUri) {
+      console.log('No recordingUri provided for playback');
+      return;
+    }
     setIsLoadingSound(true);
     console.log("Loading sound from:", recordingUri);
     try {
@@ -210,33 +226,87 @@ const HistoryDetail = ({ route, navigation }) => {
   const predictionImageSource = getPredictionImage(displayPrediction);
   console.log("HistoryDetail - Image source:", predictionImageSource ? "Found" : "Not found");
 
-  const startRecording = async () => {
-    // ... your existing code to start recording ...
-    setRecordingDuration(0);
-    setAmplitude(0);
+  // const startRecording = async () => {
+  //   try {
+  //     // Clean up any existing recording
+  //     if (recordingRef.current) {
+  //       try {
+  //         const status = await recordingRef.current.getStatusAsync();
+  //         if (status.isLoaded) {
+  //           if (status.isRecording) {
+  //             await recordingRef.current.stopAndUnloadAsync();
+  //           } else {
+  //             await recordingRef.current.unloadAsync();
+  //           }
+  //         }
+  //       } catch (cleanupError) {
+  //         // Ignore cleanup errors
+  //       }
+  //       recordingRef.current = null;
+  //       setRecording(null);
+  //     }
 
-    // Start timer
-    const timer = setInterval(async () => {
-      setRecordingDuration(prev => prev + 1);
+  //     const permission = await Audio.requestPermissionsAsync();
+  //     if (permission.status !== "granted") {
+  //       Alert.alert("Permission Required", "Please grant microphone permissions to record audio.");
+  //       return;
+  //     }
+  //     await Audio.setAudioModeAsync({
+  //       allowsRecordingIOS: true,
+  //       playsInSilentModeIOS: true,
+  //     });
+  //     const { recording } = await Audio.Recording.createAsync({
+  //       android: {
+  //         extension: '.m4a',
+  //         outputFormat: Audio.RECORDING_OPTION_ANDROID_OUTPUT_FORMAT_MPEG_4,
+  //         audioEncoder: Audio.RECORDING_OPTION_ANDROID_AUDIO_ENCODER_AAC,
+  //         sampleRate: 16000,
+  //         numberOfChannels: 1,
+  //         bitRate: 64000,
+  //       },
+  //       ios: {
+  //         extension: '.m4a',
+  //         outputFormat: Audio.RECORDING_OPTION_IOS_OUTPUT_FORMAT_MPEG4AAC,
+  //         audioQuality: Audio.RECORDING_OPTION_IOS_AUDIO_QUALITY_HIGH,
+  //         sampleRate: 16000,
+  //         numberOfChannels: 1,
+  //         bitRate: 64000,
+  //         linearPCMBitDepth: 16,
+  //         linearPCMIsBigEndian: false,
+  //         linearPCMIsFloat: false,
+  //       },
+  //       isMeteringEnabled: true,
+  //     });
+  //     recordingRef.current = recording;
+  //     setRecording(recording);
+  //     setIsRecording(true);
+  //     setRecordingDuration(0);
+  //     timerRef.current = setInterval(async () => {
+  //       if (recordingRef.current) {
+  //         const status = await recordingRef.current.getStatusAsync();
+  //         setRecordingDuration(Math.floor((status.durationMillis || 0) / 1000));
+  //       }
+  //     }, 1000);
+  //   } catch (error) {
+  //     Alert.alert("Error", "Failed to start recording.");
+  //   }
+  // };
 
-      // If you want amplitude:
-      if (recording) {
-        const status = await recording.getStatusAsync();
-        if (status.metering) {
-          setAmplitude(status.metering);
-        }
-      }
-    }, 1000);
-    setDurationTimer(timer);
-  };
-
-  const stopRecording = async () => {
-    // ... your existing code to stop recording ...
-    if (durationTimer) {
-      clearInterval(durationTimer);
-      setDurationTimer(null);
-    }
-  };
+  // const stopRecording = async () => {
+  //   if (!isRecording || !recordingRef.current) return;
+  //   try {
+  //     clearInterval(timerRef.current);
+  //     timerRef.current = null;
+  //     await recordingRef.current.stopAndUnloadAsync();
+  //     const uri = recordingRef.current.getURI();
+  //     setNewRecordingUri(uri);
+  //     setIsRecording(false);
+  //     setRecording(null);
+  //     Alert.alert("Recording Saved", `Recording saved at: ${uri}`);
+  //   } catch (error) {
+  //     Alert.alert("Error", "Failed to stop recording.");
+  //   }
+  //  };
 
   return (
     <View style={styles.container}>
@@ -260,7 +330,9 @@ const HistoryDetail = ({ route, navigation }) => {
 
       <View style={styles.contentContainer}>
         <Text style={styles.timestampText}>{formattedTimestamp}</Text>
-        <Text style={styles.durationText}>Duration: {duration || "N/A"}</Text>
+        <Text style={styles.durationText}>
+          Duration: {formatDuration(recordingDuration)}
+        </Text>
 
         <View style={styles.predictionSection}>
           <View style={styles.imageWrapper}>
@@ -304,7 +376,7 @@ const HistoryDetail = ({ route, navigation }) => {
           <Text style={styles.detailsText}>{fullPredictionName}</Text>
         </View>
 
-        <Text>Recording: {formatDuration(recordingDuration)}</Text>
+       
         <View style={{ height: 10, width: amplitude * 2, backgroundColor: 'red' }} />
       </View>
     </View>

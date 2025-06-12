@@ -16,6 +16,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import Icon from "react-native-vector-icons/Ionicons";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { baseIP } from "../const";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // API URL - Must match the one in Recording.js
 const API_HISTORY_URL = `http://${baseIP}:5000/history`;
@@ -98,22 +99,54 @@ const getPredictionImage = (prediction) => {
   return map[lower] || require("../assets/icon.png");
 };
 
+// Format duration for display
+const formatDuration = (seconds) => {
+  if (!seconds && seconds !== 0) return "0:00";
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = seconds % 60;
+  return `${minutes}:${String(remainingSeconds).padStart(2, "0")}`;
+};
+
 // Add this helper to delete a history item by id
 const deleteHistoryItem = async (id) => {
   try {
-    // You may need to update the URL to match your backend's delete endpoint
+    console.log(`Deleting history item with ID: ${id}`);
+    
+    // Make sure the URL matches the backend's delete endpoint
     const response = await fetch(`${API_HISTORY_URL}/${id}`, {
       method: "DELETE",
+      headers: {
+        'Content-Type': 'application/json',
+      },
     });
+    
     if (!response.ok) {
+      if (response.status === 404) {
+        // Treat 404 as success (item already deleted on server)
+        return true;
+      }
+      const errorText = await response.text();
+      console.error(`Failed to delete history item. Status: ${response.status}, Error: ${errorText}`);
       throw new Error(
         `Failed to delete history item. Status: ${response.status}`
       );
     }
+    
+    console.log("History item deleted successfully");
     return true;
   } catch (error) {
     console.error("Error deleting history item:", error);
     return false;
+  }
+};
+
+const clearHistory = async () => {
+  try {
+    await AsyncStorage.removeItem("@CryCare_History");
+    Alert.alert("Success", "History cleared!");
+    fetchHistory();
+  } catch (error) {
+    Alert.alert("Error", "Failed to clear history: " + error.message);
   }
 };
 
@@ -123,6 +156,7 @@ const History = () => {
   const [historyData, setHistoryData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [deleteInProgress, setDeleteInProgress] = useState(false);
 
   // Function to fetch history from backend
   const fetchHistory = async () => {
@@ -154,6 +188,14 @@ const History = () => {
         }
 
         const { date, time } = formatDate(item.timestamp);
+        
+        // Format duration properly
+        let formattedDuration = "0:00";
+        if (item.duration) {
+          formattedDuration = item.duration;
+        } else if (typeof item.recordingDuration === 'number') {
+          formattedDuration = formatDuration(item.recordingDuration);
+        }
 
         return {
           id: item.id || `history-${Math.random()}`,
@@ -166,7 +208,8 @@ const History = () => {
           prediction: prediction,
           predictions: item.predictions,
           recordingUri: item.recordingUri,
-          duration: item.duration,
+          duration: formattedDuration,
+          recordingDuration: item.recordingDuration || 0,
         };
       });
 
@@ -200,6 +243,55 @@ const History = () => {
   const onRefresh = () => {
     setRefreshing(true);
     fetchHistory();
+  };
+  
+  // Handle item deletion
+  const handleDeleteItem = async (id) => {
+    if (deleteInProgress) return;
+    setDeleteInProgress(true);
+
+    try {
+      Alert.alert(
+        "Delete History",
+        "Are you sure you want to delete this history entry?",
+        [
+          { 
+            text: "Cancel", 
+            style: "cancel",
+            onPress: () => setDeleteInProgress(false)
+          },
+          {
+            text: "Delete",
+            style: "destructive",
+            onPress: async () => {
+              try {
+                const success = await deleteHistoryItem(id);
+
+                // Remove from AsyncStorage (if used)
+                try {
+                  const historyJson = await AsyncStorage.getItem("@CryCare_History");
+                  let history = historyJson ? JSON.parse(historyJson) : [];
+                  history = history.filter(item => item.id !== id);
+                  await AsyncStorage.setItem("@CryCare_History", JSON.stringify(history));
+                } catch (e) {
+                  // Ignore local storage errors
+                }
+
+                // Always refresh the list from backend
+                fetchHistory();
+              } catch (error) {
+                Alert.alert("Error", "An error occurred while deleting.");
+              } finally {
+                setDeleteInProgress(false);
+              }
+            },
+          },
+        ],
+        { cancelable: true, onDismiss: () => setDeleteInProgress(false) }
+      );
+    } catch (error) {
+      setDeleteInProgress(false);
+    }
   };
 
   return (
@@ -243,32 +335,8 @@ const History = () => {
             <TouchableOpacity
               key={item.id}
               onPress={() => navigation.navigate("HistoryDetail", item)}
-              onLongPress={async () => {
-                Alert.alert(
-                  "Delete History",
-                  "Are you sure you want to delete this history entry?",
-                  [
-                    { text: "Cancel", style: "cancel" },
-                    {
-                      text: "Delete",
-                      style: "destructive",
-                      onPress: async () => {
-                        const success = await deleteHistoryItem(item.id);
-                        if (success) {
-                          setHistoryData((prev) =>
-                            prev.filter((h) => h.id !== item.id)
-                          );
-                        } else {
-                          Alert.alert(
-                            "Error",
-                            "Failed to delete history entry."
-                          );
-                        }
-                      },
-                    },
-                  ]
-                );
-              }}
+              onLongPress={() => handleDeleteItem(item.id)}
+              delayLongPress={500}
               style={styles.historyItem}
             >
               <View style={styles.iconContainer}>
@@ -285,7 +353,7 @@ const History = () => {
                   {getFullPredictionName(item.status)}
                 </Text>
                 <Text style={styles.durationText}>
-                  Duration: {item.duration || "N/A"}
+                  Duration: {formatDuration(item.recordingDuration || 0)}
                 </Text>
               </View>
               <Icon name="chevron-forward-outline" size={24} color="#ccc" />
