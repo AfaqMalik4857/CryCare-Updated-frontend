@@ -1,0 +1,10 @@
+Flask
+werkzeug
+librosa
+numpy
+pandas
+joblib
+scikit-learn
+xgboost
+imbalanced-learn
+
