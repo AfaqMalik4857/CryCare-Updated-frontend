@@ -89,8 +89,8 @@ const getPredictionImage = (prediction) => {
     p: require("../assets/Pains.png"),
     pain: require("../assets/Pains.png"),
     belly_pain: require("../assets/Pains.png"),
-    d: require("../assets/sleepingbaby.png"),
-    discomfort: require("../assets/sleepingbaby.png"),
+    d: require("../assets/discomfort.jpg"),
+    discomfort: require("../assets/discomfort.jpg"),
     b: require("../assets/burping.png"),
     burping: require("../assets/burping.png"),
     t: require("../assets/Sleep.png"),
@@ -111,27 +111,39 @@ const formatDuration = (seconds) => {
 const deleteHistoryItem = async (id) => {
   try {
     console.log(`Deleting history item with ID: ${id}`);
-    
+
     // Make sure the URL matches the backend's delete endpoint
-    const response = await fetch(`${API_HISTORY_URL}/${id}`, {
-      method: "DELETE",
-      headers: {
-        'Content-Type': 'application/json',
-      },
-    });
-    
+    const response = await fetch(
+      `${API_HISTORY_URL}/${encodeURIComponent(id)}`,
+      {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }
+    );
+
+    console.log(`Delete response status: ${response.status}`);
+
     if (!response.ok) {
       if (response.status === 404) {
         // Treat 404 as success (item already deleted on server)
+        console.log(
+          "Item not found on server, treating as successful deletion"
+        );
         return true;
       }
       const errorText = await response.text();
-      console.error(`Failed to delete history item. Status: ${response.status}, Error: ${errorText}`);
+      console.error(
+        `Failed to delete history item. Status: ${response.status}, Error: ${errorText}`
+      );
       throw new Error(
         `Failed to delete history item. Status: ${response.status}`
       );
     }
-    
+
+    const responseData = await response.json();
+    console.log("Delete response:", responseData);
     console.log("History item deleted successfully");
     return true;
   } catch (error) {
@@ -188,12 +200,14 @@ const History = () => {
         }
 
         const { date, time } = formatDate(item.timestamp);
-        
+
         // Format duration properly
         let formattedDuration = "0:00";
-        if (item.duration) {
+        if (item.duration && typeof item.duration === "number") {
+          formattedDuration = formatDuration(item.duration);
+        } else if (item.duration && typeof item.duration === "string") {
           formattedDuration = item.duration;
-        } else if (typeof item.recordingDuration === 'number') {
+        } else if (typeof item.recordingDuration === "number") {
           formattedDuration = formatDuration(item.recordingDuration);
         }
 
@@ -209,7 +223,7 @@ const History = () => {
           predictions: item.predictions,
           recordingUri: item.recordingUri,
           duration: formattedDuration,
-          recordingDuration: item.recordingDuration || 0,
+          recordingDuration: item.duration || item.recordingDuration || 0,
         };
       });
 
@@ -244,7 +258,7 @@ const History = () => {
     setRefreshing(true);
     fetchHistory();
   };
-  
+
   // Handle item deletion
   const handleDeleteItem = async (id) => {
     if (deleteInProgress) return;
@@ -255,10 +269,10 @@ const History = () => {
         "Delete History",
         "Are you sure you want to delete this history entry?",
         [
-          { 
-            text: "Cancel", 
+          {
+            text: "Cancel",
             style: "cancel",
-            onPress: () => setDeleteInProgress(false)
+            onPress: () => setDeleteInProgress(false),
           },
           {
             text: "Delete",
@@ -267,18 +281,27 @@ const History = () => {
               try {
                 const success = await deleteHistoryItem(id);
 
-                // Remove from AsyncStorage (if used)
-                try {
-                  const historyJson = await AsyncStorage.getItem("@CryCare_History");
-                  let history = historyJson ? JSON.parse(historyJson) : [];
-                  history = history.filter(item => item.id !== id);
-                  await AsyncStorage.setItem("@CryCare_History", JSON.stringify(history));
-                } catch (e) {
-                  // Ignore local storage errors
-                }
+                if (success) {
+                  // Remove from AsyncStorage (if used)
+                  try {
+                    const historyJson = await AsyncStorage.getItem(
+                      "@CryCare_History"
+                    );
+                    let history = historyJson ? JSON.parse(historyJson) : [];
+                    history = history.filter((item) => item.id !== id);
+                    await AsyncStorage.setItem(
+                      "@CryCare_History",
+                      JSON.stringify(history)
+                    );
+                  } catch (e) {
+                    // Ignore local storage errors
+                  }
 
-                // Always refresh the list from backend
-                fetchHistory();
+                  // Always refresh the list from backend to ensure sync
+                  await fetchHistory();
+                } else {
+                  Alert.alert("Error", "Failed to delete the history item.");
+                }
               } catch (error) {
                 Alert.alert("Error", "An error occurred while deleting.");
               } finally {
@@ -353,7 +376,7 @@ const History = () => {
                   {getFullPredictionName(item.status)}
                 </Text>
                 <Text style={styles.durationText}>
-                  Duration: {formatDuration(item.recordingDuration || 0)}
+                  Duration: {item.duration}
                 </Text>
               </View>
               <Icon name="chevron-forward-outline" size={24} color="#ccc" />

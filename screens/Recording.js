@@ -28,12 +28,12 @@ const HISTORY_KEY = "@CryCare_History";
 
 // Recording states
 const RECORDING_STATE = {
-  IDLE: 'idle',
-  INITIALIZING: 'initializing',
-  RECORDING: 'recording',
-  STOPPING: 'stopping',
-  PROCESSING: 'processing',
-  ERROR: 'error'
+  IDLE: "idle",
+  INITIALIZING: "initializing",
+  RECORDING: "recording",
+  STOPPING: "stopping",
+  PROCESSING: "processing",
+  ERROR: "error",
 };
 
 const Recording = ({ navigation }) => {
@@ -42,30 +42,30 @@ const Recording = ({ navigation }) => {
   const [recordingDuration, setRecordingDuration] = useState(0);
   const [loading, setLoading] = useState(false);
   const [buttonDisabled, setButtonDisabled] = useState(false);
-  
+
   // Core recording state - single source of truth
   const [recordingState, setRecordingState] = useState(RECORDING_STATE.IDLE);
-  
+
   // Refs
   const recorderRef = useRef(null);
   const recordingUriRef = useRef(null);
   const timerRef = useRef(null);
   const amplitudeTimerRef = useRef(null);
   const recordingStartTimeRef = useRef(null);
-  
+
   // Cleanup function for timers
   const cleanupTimers = () => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
-    
+
     if (amplitudeTimerRef.current) {
       clearInterval(amplitudeTimerRef.current);
       amplitudeTimerRef.current = null;
     }
   };
-  
+
   // Reset all states to initial values
   const resetStates = () => {
     setRecordingDuration(0);
@@ -73,12 +73,12 @@ const Recording = ({ navigation }) => {
     recordingUriRef.current = null;
     recordingStartTimeRef.current = null;
   };
-  
+
   // Initialize recording system
   const initializeRecording = async () => {
     try {
       console.log("Initializing recording system...");
-      
+
       // Request permissions
       const permission = await Audio.requestPermissionsAsync();
       if (permission.status !== "granted") {
@@ -100,7 +100,7 @@ const Recording = ({ navigation }) => {
         playThroughEarpieceAndroid: false,
         staysActiveInBackground: false,
       });
-      
+
       console.log("Recording system initialized successfully");
       return true;
     } catch (error) {
@@ -109,7 +109,7 @@ const Recording = ({ navigation }) => {
       return false;
     }
   };
-  
+
   // Start recording
   const startRecording = async () => {
     // Prevent action if not in IDLE state
@@ -117,24 +117,24 @@ const Recording = ({ navigation }) => {
       console.log("Cannot start recording - not in IDLE state");
       return;
     }
-    
+
     setButtonDisabled(true);
     setRecordingState(RECORDING_STATE.INITIALIZING);
-    
+
     try {
       // Reset states
       resetStates();
-      
+
       // Initialize recording system
       const initialized = await initializeRecording();
       if (!initialized) {
         throw new Error("Failed to initialize recording system");
       }
-      
+
       // Create recording options
       const recordingOptions = {
         android: {
-          extension: '.m4a',
+          extension: ".m4a",
           outputFormat: Audio.RECORDING_OPTION_ANDROID_OUTPUT_FORMAT_MPEG_4,
           audioEncoder: Audio.RECORDING_OPTION_ANDROID_AUDIO_ENCODER_AAC,
           sampleRate: 16000,
@@ -142,7 +142,7 @@ const Recording = ({ navigation }) => {
           bitRate: 64000,
         },
         ios: {
-          extension: '.m4a',
+          extension: ".m4a",
           outputFormat: Audio.RECORDING_OPTION_IOS_OUTPUT_FORMAT_MPEG4AAC,
           audioQuality: Audio.RECORDING_OPTION_IOS_AUDIO_QUALITY_HIGH,
           sampleRate: 16000,
@@ -154,17 +154,17 @@ const Recording = ({ navigation }) => {
         },
         isMeteringEnabled: true,
       };
-      
+
       // Create a new recording
       const { recording } = await Audio.Recording.createAsync(recordingOptions);
       recorderRef.current = recording;
-      
+
       // Store start time
       recordingStartTimeRef.current = Date.now();
-      
+
       // Start duration timer
       timerRef.current = setInterval(() => {
-        setRecordingDuration(prev => prev + 1);
+        setRecordingDuration((prev) => prev + 1);
       }, 1000);
 
       // Start amplitude polling
@@ -172,8 +172,11 @@ const Recording = ({ navigation }) => {
         try {
           if (recorderRef.current) {
             const status = await recorderRef.current.getStatusAsync();
-            if (status.isRecording && typeof status.metering === 'number') {
-              const normalized = Math.max(0.1, Math.min(2, (status.metering / -20) + 1));
+            if (status.isRecording && typeof status.metering === "number") {
+              const normalized = Math.max(
+                0.1,
+                Math.min(2, status.metering / -20 + 1)
+              );
               amplitude.setValue(normalized);
             }
           }
@@ -189,7 +192,7 @@ const Recording = ({ navigation }) => {
       console.error("Error starting recording:", error);
       Alert.alert("Error", `Failed to start recording: ${error.message}`);
       setRecordingState(RECORDING_STATE.ERROR);
-      
+
       // Clean up any partial recording
       if (recorderRef.current) {
         try {
@@ -199,7 +202,7 @@ const Recording = ({ navigation }) => {
         }
         recorderRef.current = null;
       }
-      
+
       // Reset audio mode
       try {
         await Audio.setAudioModeAsync({
@@ -213,7 +216,7 @@ const Recording = ({ navigation }) => {
       setButtonDisabled(false);
     }
   };
-  
+
   // Stop recording
   const stopRecording = async () => {
     // Prevent action if not in RECORDING state
@@ -221,28 +224,31 @@ const Recording = ({ navigation }) => {
       console.log("Cannot stop recording - not in RECORDING state");
       return;
     }
-    
+
     setButtonDisabled(true);
     setRecordingState(RECORDING_STATE.STOPPING);
-    
+
     try {
       // Clean up timers
       cleanupTimers();
-      
+
       // Calculate final duration
-      const finalDuration = recordingStartTimeRef.current 
+      const finalDuration = recordingStartTimeRef.current
         ? Math.round((Date.now() - recordingStartTimeRef.current) / 1000)
         : recordingDuration;
-      
+
       // Update duration state with final value
       setRecordingDuration(finalDuration);
-      
+
       console.log("Final recording duration:", finalDuration);
-      
+
       // Check if recording is too short
       if (finalDuration < 1) {
-        Alert.alert("Recording Too Short", "Please record for at least 1 second.");
-        
+        Alert.alert(
+          "Recording Too Short",
+          "Please record for at least 1 second."
+        );
+
         // Clean up recording
         if (recorderRef.current) {
           try {
@@ -252,44 +258,49 @@ const Recording = ({ navigation }) => {
           }
           recorderRef.current = null;
         }
-        
+
         // Reset audio mode
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: false,
           playsInSilentModeIOS: false,
         });
-        
+
         setRecordingState(RECORDING_STATE.IDLE);
         return;
       }
-      
+
       // Get URI before stopping
       let uri = null;
       if (recorderRef.current) {
         try {
           uri = recorderRef.current.getURI();
           recordingUriRef.current = uri;
-          
+
           console.log("Recording URI before stopping:", uri);
-          
+
           // Stop recording
           await recorderRef.current.stopAndUnloadAsync();
           // Add a small delay to ensure durationMillis is set
-          await new Promise(resolve => setTimeout(resolve, 300));
+          await new Promise((resolve) => setTimeout(resolve, 300));
           const status = await recorderRef.current.getStatusAsync();
-          const durationInSeconds = Math.floor((status.durationMillis || 0) / 1000);
+          const durationInSeconds = Math.floor(
+            (status.durationMillis || 0) / 1000
+          );
           console.log("Recording status after stop:", status);
           console.log("Calculated durationInSeconds:", durationInSeconds);
-          
+
+          // Update duration state with final value
+          setRecordingDuration(durationInSeconds);
+
           // Reset recorder ref
           recorderRef.current = null;
-          
+
           // Reset audio mode
           await Audio.setAudioModeAsync({
             allowsRecordingIOS: false,
             playsInSilentModeIOS: false,
           });
-          
+
           // Process the recording
           await processRecording(uri, durationInSeconds);
         } catch (error) {
@@ -305,7 +316,7 @@ const Recording = ({ navigation }) => {
       setButtonDisabled(false);
     }
   };
-  
+
   // Process recording and send to API
   const processRecording = async (uri, durationInSeconds) => {
     if (!uri) {
@@ -313,21 +324,23 @@ const Recording = ({ navigation }) => {
       setRecordingState(RECORDING_STATE.ERROR);
       return;
     }
-    
+
     setRecordingState(RECORDING_STATE.PROCESSING);
     setLoading(true);
 
     try {
       // Create form data
       const formData = new FormData();
-      const fileUri = Platform.OS === 'android' ? uri : uri.replace('file://', '');
+      const fileUri =
+        Platform.OS === "android" ? uri : uri.replace("file://", "");
 
       formData.append("file", {
         uri: fileUri,
         type: "audio/m4a",
         name: "recording.m4a",
       });
-      
+      formData.append("duration", durationInSeconds.toString());
+
       console.log("Sending audio to API:", API_URL);
       console.log("Audio URI:", fileUri);
       console.log("Audio duration:", durationInSeconds);
@@ -340,10 +353,12 @@ const Recording = ({ navigation }) => {
           "Content-Type": "multipart/form-data",
         },
       });
-      
+
       if (!response.ok) {
         const errorText = await response.text();
-        throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+        throw new Error(
+          `API request failed with status ${response.status}: ${errorText}`
+        );
       }
 
       const responseText = await response.text();
@@ -358,7 +373,7 @@ const Recording = ({ navigation }) => {
       } catch (e) {
         throw new Error("Invalid API response format");
       }
-      if (!predictions || typeof predictions !== 'object') {
+      if (!predictions || typeof predictions !== "object") {
         throw new Error("Invalid predictions format");
       }
       // Get the XGBoost prediction
@@ -367,7 +382,7 @@ const Recording = ({ navigation }) => {
       let prediction;
       if (Array.isArray(xgboostPrediction) && xgboostPrediction.length > 0) {
         prediction = xgboostPrediction[0];
-      } else if (typeof xgboostPrediction === 'string') {
+      } else if (typeof xgboostPrediction === "string") {
         prediction = xgboostPrediction;
       } else {
         prediction = "Unknown";
@@ -381,7 +396,7 @@ const Recording = ({ navigation }) => {
       // Format duration for display
       const formattedDuration = formatDuration(durationInSeconds);
       console.log("Formatted duration:", formattedDuration);
-      
+
       // Create history item
       const timestamp = new Date().toISOString();
       const historyItem = {
@@ -393,13 +408,13 @@ const Recording = ({ navigation }) => {
         prediction: fullPredictionName,
         timestamp: timestamp,
       };
-      
+
       // Save to history
       await saveToHistory(historyItem);
-      
+
       // Navigate to results screen
       navigation.navigate("HistoryDetail", historyItem);
-      
+
       // Reset state to idle
       setRecordingState(RECORDING_STATE.IDLE);
     } catch (error) {
@@ -410,22 +425,22 @@ const Recording = ({ navigation }) => {
       setLoading(false);
     }
   };
-  
+
   // Save history item to AsyncStorage
   const saveToHistory = async (historyItem) => {
     try {
       // Get existing history
       const historyJson = await AsyncStorage.getItem(HISTORY_KEY);
       let history = historyJson ? JSON.parse(historyJson) : [];
-      
+
       // Add new item
       history.unshift(historyItem);
-      
+
       // Limit history size
       if (history.length > 50) {
         history = history.slice(0, 50);
       }
-      
+
       // Save back to AsyncStorage
       await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(history));
       console.log("History saved successfully");
@@ -433,18 +448,20 @@ const Recording = ({ navigation }) => {
       console.error("Error saving history:", error);
     }
   };
-  
+
   // Reset recording system on error
   useEffect(() => {
     if (recordingState === RECORDING_STATE.ERROR) {
       const resetSystem = async () => {
         // Clean up timers
         cleanupTimers();
-        
+
         // Clean up recording
         if (recorderRef.current) {
           try {
-            const status = await recorderRef.current.getStatusAsync().catch(() => null);
+            const status = await recorderRef.current
+              .getStatusAsync()
+              .catch(() => null);
             if (status && status.isLoaded) {
               if (status.isRecording) {
                 await recorderRef.current.stopAndUnloadAsync();
@@ -457,7 +474,7 @@ const Recording = ({ navigation }) => {
           }
           recorderRef.current = null;
         }
-        
+
         // Reset audio mode
         try {
           await Audio.setAudioModeAsync({
@@ -467,31 +484,33 @@ const Recording = ({ navigation }) => {
         } catch (error) {
           console.log("Error resetting audio mode:", error);
         }
-        
+
         // Reset states
         resetStates();
-        
+
         // Return to idle state after a delay
         setTimeout(() => {
           setRecordingState(RECORDING_STATE.IDLE);
         }, 1000);
       };
-      
+
       resetSystem();
     }
   }, [recordingState]);
-  
+
   // Clean up on unmount
   useEffect(() => {
     return () => {
       const cleanup = async () => {
         // Clean up timers
         cleanupTimers();
-        
+
         // Clean up recording
         if (recorderRef.current) {
           try {
-            const status = await recorderRef.current.getStatusAsync().catch(() => null);
+            const status = await recorderRef.current
+              .getStatusAsync()
+              .catch(() => null);
             if (status && status.isLoaded) {
               if (status.isRecording) {
                 await recorderRef.current.stopAndUnloadAsync();
@@ -503,7 +522,7 @@ const Recording = ({ navigation }) => {
             console.log("Error cleaning up recording:", error);
           }
         }
-        
+
         // Reset audio mode
         try {
           await Audio.setAudioModeAsync({
@@ -514,35 +533,38 @@ const Recording = ({ navigation }) => {
           console.log("Error resetting audio mode:", error);
         }
       };
-      
+
       cleanup();
     };
   }, []);
 
   // Helper function to get the full name of the prediction
   const getFullPredictionName = (prediction) => {
-    if (!prediction || typeof prediction !== 'string') {
+    if (!prediction || typeof prediction !== "string") {
       return "Unknown";
     }
 
     const lowerCasePrediction = prediction.toLowerCase().trim();
-    
+
     // Map of prediction values to their full names
     const predictionMap = {
-      'h': 'Hungry',
-      'hungry': 'Hungry',
-      'p': 'Pain',
-      'pain': 'Pain',
-      'belly_pain': 'Pain',
-      'd': 'Discomfort',
-      'discomfort': 'Discomfort',
-      'b': 'Burping',
-      'burping': 'Burping',
-      't': 'Tired',
-      'tired': 'Tired'
+      h: "Hungry",
+      hungry: "Hungry",
+      p: "Pain",
+      pain: "Pain",
+      belly_pain: "Pain",
+      d: "Discomfort",
+      discomfort: "Discomfort",
+      b: "Burping",
+      burping: "Burping",
+      t: "Tired",
+      tired: "Tired",
     };
 
-    return predictionMap[lowerCasePrediction] || prediction.charAt(0).toUpperCase() + prediction.slice(1);
+    return (
+      predictionMap[lowerCasePrediction] ||
+      prediction.charAt(0).toUpperCase() + prediction.slice(1)
+    );
   };
 
   // Format duration
@@ -561,16 +583,17 @@ const Recording = ({ navigation }) => {
       startRecording();
     }
   };
-  
+
   // Determine if button should be disabled
-  const isButtonDisabled = buttonDisabled || 
-    recordingState === RECORDING_STATE.INITIALIZING || 
-    recordingState === RECORDING_STATE.STOPPING || 
+  const isButtonDisabled =
+    buttonDisabled ||
+    recordingState === RECORDING_STATE.INITIALIZING ||
+    recordingState === RECORDING_STATE.STOPPING ||
     recordingState === RECORDING_STATE.PROCESSING;
-  
+
   // Determine if recording is active
   const isRecordingActive = recordingState === RECORDING_STATE.RECORDING;
-  
+
   // Determine if loading overlay should be shown
   const showLoading = recordingState === RECORDING_STATE.PROCESSING || loading;
 
@@ -587,7 +610,7 @@ const Recording = ({ navigation }) => {
               <TouchableOpacity
                 style={[
                   styles.recordingButton,
-                  isButtonDisabled && styles.disabledButton
+                  isButtonDisabled && styles.disabledButton,
                 ]}
                 onPress={handleButtonPress}
                 disabled={isButtonDisabled}
@@ -612,13 +635,13 @@ const Recording = ({ navigation }) => {
                   />
                 </Animated.View>
               </TouchableOpacity>
-              
+
               <Text style={styles.recordingText}>
                 {isRecordingActive
                   ? `Recording... ${formatDuration(recordingDuration)}`
                   : "Tap to Record"}
               </Text>
-              
+
               <Text style={styles.instructionText}>
                 {isRecordingActive
                   ? "Tap again to stop recording"
@@ -642,14 +665,12 @@ const Recording = ({ navigation }) => {
               </View>
               <View style={styles.infoItem}>
                 <Icon name="analytics-outline" size={scale * 20} color="#fff" />
-                <Text style={styles.infoText}>
-                  View the analysis results
-                </Text>
+                <Text style={styles.infoText}>View the analysis results</Text>
               </View>
             </View>
           </View>
         </ScrollView>
-        
+
         {/* State indicator for debugging */}
         {/* <View style={styles.stateIndicator}>
           <Text style={styles.stateText}>{recordingState}</Text>

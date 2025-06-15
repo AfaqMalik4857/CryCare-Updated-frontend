@@ -23,16 +23,20 @@ const formatDuration = (seconds) => {
 // Helper function to get the XGBoost prediction label safely
 const getXGBoostPrediction = (predictions) => {
   console.log("Getting XGBoost prediction from:", predictions);
-  
-  if (!predictions || !predictions.XGBoost || !Array.isArray(predictions.XGBoost)) {
+
+  if (
+    !predictions ||
+    !predictions.XGBoost ||
+    !Array.isArray(predictions.XGBoost)
+  ) {
     console.log("Invalid predictions format");
     return "Unknown";
   }
 
   const prediction = predictions.XGBoost[0];
   console.log("Raw prediction value:", prediction);
-  
-  if (!prediction || typeof prediction !== 'string') {
+
+  if (!prediction || typeof prediction !== "string") {
     console.log("Invalid prediction value");
     return "Unknown";
   }
@@ -42,7 +46,7 @@ const getXGBoostPrediction = (predictions) => {
 
 // Helper function to get the full name of the prediction
 const getFullPredictionName = (prediction) => {
-  if (!prediction || typeof prediction !== 'string') {
+  if (!prediction || typeof prediction !== "string") {
     console.log("Invalid prediction for name:", prediction);
     return "Unknown";
   }
@@ -51,17 +55,17 @@ const getFullPredictionName = (prediction) => {
   console.log("Getting full name for prediction:", lowerCasePrediction);
 
   const nameMap = {
-    'h': 'Hungry',
-    'hungry': 'Hungry',
-    'p': 'Pain',
-    'pain': 'Pain',
-    'belly_pain': 'Pain',
-    'd': 'Discomfort',
-    'discomfort': 'Discomfort',
-    'b': 'Burping',
-    'burping': 'Burping',
-    't': 'Tired',
-    'tired': 'Tired'
+    h: "Hungry",
+    hungry: "Hungry",
+    p: "Pain",
+    pain: "Pain",
+    belly_pain: "Pain",
+    d: "Discomfort",
+    discomfort: "Discomfort",
+    b: "Burping",
+    burping: "Burping",
+    t: "Tired",
+    tired: "Tired",
   };
 
   return nameMap[lowerCasePrediction] || "Unknown";
@@ -69,7 +73,7 @@ const getFullPredictionName = (prediction) => {
 
 // Helper function to get an appropriate image source based on prediction
 const getPredictionImage = (prediction) => {
-  if (!prediction || typeof prediction !== 'string') {
+  if (!prediction || typeof prediction !== "string") {
     console.log("Invalid prediction for image:", prediction);
     return require("../assets/icon.png");
   }
@@ -78,17 +82,17 @@ const getPredictionImage = (prediction) => {
   console.log("Getting image for prediction:", lowerCasePrediction);
 
   const imageMap = {
-    'h': require("../assets/HungryBaby.png"),
-    'hungry': require("../assets/HungryBaby.png"),
-    'p': require("../assets/Pains.png"),
-    'pain': require("../assets/Pains.png"),
-    'belly_pain': require("../assets/Pains.png"),
-    'd': require("../assets/sleepingbaby.png"),
-    'discomfort': require("../assets/sleepingbaby.png"),
-    'b': require("../assets/burping.png"),
-    'burping': require("../assets/burping.png"),
-    't': require("../assets/Sleep.png"),
-    'tired': require("../assets/Sleep.png")
+    h: require("../assets/HungryBaby.png"),
+    hungry: require("../assets/HungryBaby.png"),
+    p: require("../assets/Pains.png"),
+    pain: require("../assets/Pains.png"),
+    belly_pain: require("../assets/Pains.png"),
+    d: require("../assets/discomfort.jpg"),
+    discomfort: require("../assets/discomfort.jpg"),
+    b: require("../assets/burping.png"),
+    burping: require("../assets/burping.png"),
+    t: require("../assets/tired.png"),
+    tired: require("../assets/tired.png"),
   };
 
   return imageMap[lowerCasePrediction] || require("../assets/icon.png");
@@ -96,13 +100,19 @@ const getPredictionImage = (prediction) => {
 
 const HistoryDetail = ({ route, navigation }) => {
   // Extract parameters passed from Recording screen or History screen
-  const { recordingUri, duration, predictions, timestamp, prediction, recordingDuration: initialRecordingDuration } =
-    route.params;
+  const {
+    recordingUri,
+    duration,
+    predictions,
+    timestamp,
+    prediction,
+    recordingDuration: initialRecordingDuration,
+  } = route.params;
 
   console.log("HistoryDetail - Received params:", {
     prediction,
     predictions,
-    timestamp
+    timestamp,
   });
 
   // Determine the prediction to display
@@ -126,7 +136,13 @@ const HistoryDetail = ({ route, navigation }) => {
   const [sound, setSound] = useState(null);
   const [isPlaying, setIsPlaying] = useState(false);
   const [isLoadingSound, setIsLoadingSound] = useState(false);
-  const [recordingDuration, setRecordingDuration] = useState(initialRecordingDuration || 0);
+  const [recordingDuration, setRecordingDuration] = useState(
+    initialRecordingDuration ||
+      (typeof duration === "number" ? duration : 0) ||
+      (typeof route.params.recordingDuration === "number"
+        ? route.params.recordingDuration
+        : 0)
+  );
   const [amplitude, setAmplitude] = useState(0);
   const [durationTimer, setDurationTimer] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -138,12 +154,24 @@ const HistoryDetail = ({ route, navigation }) => {
   // Function to load the sound
   const loadSound = async () => {
     if (!recordingUri) {
-      console.log('No recordingUri provided for playback');
+      console.log("No recordingUri provided for playback");
+      Alert.alert("Error", "No recording available for playback.");
       return;
     }
     setIsLoadingSound(true);
     console.log("Loading sound from:", recordingUri);
     try {
+      // Set audio mode for playback
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        interruptionModeIOS: 1,
+        interruptionModeAndroid: 1,
+        shouldDuckAndroid: false,
+        playThroughEarpieceAndroid: false,
+        staysActiveInBackground: false,
+      });
+
       const { sound: newSound } = await Audio.Sound.createAsync(
         { uri: recordingUri },
         { shouldPlay: false } // Don't play immediately
@@ -224,7 +252,10 @@ const HistoryDetail = ({ route, navigation }) => {
 
   // Get the image source based on the prediction
   const predictionImageSource = getPredictionImage(displayPrediction);
-  console.log("HistoryDetail - Image source:", predictionImageSource ? "Found" : "Not found");
+  console.log(
+    "HistoryDetail - Image source:",
+    predictionImageSource ? "Found" : "Not found"
+  );
 
   // const startRecording = async () => {
   //   try {
@@ -331,7 +362,7 @@ const HistoryDetail = ({ route, navigation }) => {
       <View style={styles.contentContainer}>
         <Text style={styles.timestampText}>{formattedTimestamp}</Text>
         <Text style={styles.durationText}>
-          Duration: {formatDuration(recordingDuration)}
+          Duration: {duration || formatDuration(recordingDuration)}
         </Text>
 
         <View style={styles.predictionSection}>
@@ -352,7 +383,15 @@ const HistoryDetail = ({ route, navigation }) => {
         {/* Playback Controls */}
         <View style={styles.playbackContainer}>
           {isLoadingSound ? (
-            <ActivityIndicator size="large" color="#2c709e" />
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color="#2c709e" />
+              <Text style={styles.loadingText}>Loading audio...</Text>
+            </View>
+          ) : !recordingUri ? (
+            <View style={styles.noAudioContainer}>
+              <Icon name="volume-mute-outline" size={60} color="#cccccc" />
+              <Text style={styles.noAudioText}>No recording available</Text>
+            </View>
           ) : (
             <TouchableOpacity
               onPress={togglePlayback}
@@ -366,6 +405,9 @@ const HistoryDetail = ({ route, navigation }) => {
                 size={60}
                 color={sound ? "#2c709e" : "#cccccc"} // Grey out if sound not loaded
               />
+              <Text style={styles.playButtonText}>
+                {isPlaying ? "Pause" : "Play"}
+              </Text>
             </TouchableOpacity>
           )}
         </View>
@@ -376,8 +418,9 @@ const HistoryDetail = ({ route, navigation }) => {
           <Text style={styles.detailsText}>{fullPredictionName}</Text>
         </View>
 
-       
-        <View style={{ height: 10, width: amplitude * 2, backgroundColor: 'red' }} />
+        <View
+          style={{ height: 10, width: amplitude * 2, backgroundColor: "red" }}
+        />
       </View>
     </View>
   );
@@ -463,7 +506,29 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   playButton: {
-    // Style for the touchable area if needed
+    alignItems: "center",
+  },
+  playButtonText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: "#2c709e",
+    fontWeight: "500",
+  },
+  loadingContainer: {
+    alignItems: "center",
+  },
+  loadingText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: "#666",
+  },
+  noAudioContainer: {
+    alignItems: "center",
+  },
+  noAudioText: {
+    marginTop: 8,
+    fontSize: 14,
+    color: "#999",
   },
   detailsSection: {
     marginTop: 20,
