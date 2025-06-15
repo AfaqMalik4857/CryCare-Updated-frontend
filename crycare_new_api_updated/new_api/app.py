@@ -82,6 +82,10 @@ def predict_audio():
             # Call the main processing function from processing.py
             predictions = process_and_predict_file(file_path)
 
+            # Get duration from form data
+            duration_str = request.form.get("duration")
+            duration_seconds = int(duration_str) if duration_str else 0
+
             # Check if processing returned an error
             if isinstance(predictions, dict) and "error" in predictions:
                 print(f"API Error: Processing failed - {predictions['error']}")
@@ -95,7 +99,8 @@ def predict_audio():
                     "id": f"{datetime.now().isoformat()}_{os.path.basename(file_path)}",
                     "timestamp": datetime.now().isoformat(),
                     "filename": os.path.basename(file_path),
-                    "predictions": predictions
+                    "predictions": predictions,
+                    "duration": duration_seconds
                 }
                 
                 # Save to history
